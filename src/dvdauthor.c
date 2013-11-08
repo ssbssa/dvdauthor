@@ -36,6 +36,9 @@
 #include "da-internal.h"
 #include "dvdvm.h"
 
+#ifdef __MINGW32__
+#define mkdir(a,b) mkdir(a)
+#endif
 
 
 // with this enabled, extra PGC commands will be generated to allow

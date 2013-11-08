@@ -60,6 +60,7 @@ static int writefile=-1; /* fd of output file */
 static void flushclose(int fd)
   /* ensures all data has been successfully written to disk before closing fd. */
   {
+#ifndef __MINGW32__
     if
       (
 #if defined(_POSIX_SYNCHRONIZED_IO) && _POSIX_SYNCHRONIZED_IO > 0
@@ -80,6 +81,7 @@ static void flushclose(int fd)
             errno = 0;
           } /*if*/
       } /*if*/
+#endif
     close(fd);
   } /*flushclose*/
 

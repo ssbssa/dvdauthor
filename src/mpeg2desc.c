@@ -33,6 +33,13 @@
 // this is needed for FreeBSD and Windows
 #include <sys/time.h>
 
+#ifdef __MINGW32__
+#include <winsock.h>
+#include <stdlib.h>
+#define sleep(a) _sleep(a)
+#define O_NONBLOCK 0x0
+#endif
+
 #include "common.h"
 
 // #define SHOWDATA
@@ -150,6 +157,10 @@ static bool dowork
     struct timeval tv;
     if (!numofd)
         return checkin;
+#ifdef __MINGW32__
+    FD_ZERO( &rfd ); // FD_SET() adds EVERY time a new handle,
+    FD_ZERO( &wfd ); // but FD_CLR() removes only the FIRST found
+#endif
     if (checkin)
       {
         FD_SET(STDIN_FILENO, &rfd);
@@ -170,7 +181,7 @@ static bool dowork
                 if (o->fd == FD_TOOPEN)
                   {
                     int fd;
-                    fd = open(o->fname, O_CREAT | O_WRONLY | O_NONBLOCK, 0666);
+                    fd = open(o->fname, O_CREAT | O_WRONLY | O_NONBLOCK | O_BINARY, 0666);
                     if (fd == -1 && errno == ENXIO)
                       {
                         continue; /* try again later, in case pipe not created yet */
@@ -219,13 +230,33 @@ static bool dowork
         return false; /* nothing to do */
     tv.tv_sec = 1; // set timeout to 1 second just in case any files need to be opened
     tv.tv_usec = 0;
-    if (select(highestfd + 1, &rfd, &wfd, NULL, &tv) > 0)
+    int i;
+#ifndef __MINGW32__
+    i=select(highestfd + 1, &rfd, &wfd, NULL, &tv);
+#else
+    {
+      HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+      int h,qty = 0;
+
+      for( h=0; h<highestfd+1; h++ )
       {
-        int i;
+        if( FD_ISSET(h,&wfd) || FD_ISSET(h,&rfd) )
+          handles[qty++] = (HANDLE)_get_osfhandle( h );
+      }
+      i = 1 + WaitForMultipleObjects(
+          qty,handles,FALSE,tv.tv_sec*1000+tv.tv_usec/1000 );
+    }
+#endif
+    if (i > 0 )
+      {
         for (i = 0; i < numofd; i++)
           {
             struct ofd * const o = &outputfds[ofdlist[i]];
-            if (o->fd >= 0 && FD_ISSET(o->fd, &wfd))
+            if (o->fd >= 0 && FD_ISSET(o->fd, &wfd)
+#ifdef __MINGW32__
+                && WaitForSingleObject((HANDLE)_get_osfhandle(o->fd),0)>=0
+#endif
+               )
               {
                 struct fdbuf * const f = o->firstbuf;
                 int written;
@@ -255,7 +286,11 @@ static bool dowork
                 o->len -= written;
               } /*if*/
           } /*for*/
-        if (FD_ISSET(STDIN_FILENO, &rfd))
+        if (FD_ISSET(STDIN_FILENO, &rfd)
+#ifdef __MINGW32__
+            && WaitForSingleObject((HANDLE)_get_osfhandle(STDIN_FILENO),0)>=0
+#endif
+           )
             return true;
       } /*if*/
     return false;
@@ -884,6 +919,12 @@ static void process_packets
 int main(int argc,char **argv)
   {
     bool skiptohdr = false;
+
+#ifdef __MINGW32__
+    setmode(STDIN_FILENO, O_BINARY);
+    setmode(STDOUT_FILENO, O_BINARY);
+#endif
+
     fputs(PACKAGE_HEADER("mpeg2desc"), stderr);
       {
         int outputstream = 0, oc, i;

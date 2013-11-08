@@ -70,6 +70,7 @@ static char * xdg_get_config_home(void)
   /* returns the directory for holding user-specific config files, or NULL on
     error. Caller must dispose of the result pointer. */
   {
+#ifndef __MINGW32__
     char * result;
     void * to_dispose = 0;
     result = getenv("XDG_CONFIG_HOME");
@@ -89,6 +90,10 @@ static char * xdg_get_config_home(void)
       } /*if*/
     return
         result;
+#else
+    return
+        strdup("c:");
+#endif
   } /*xdg_get_config_home*/
 
 static char * xdg_config_search_path(void)
@@ -98,7 +103,11 @@ static char * xdg_config_search_path(void)
     char * result = getenv("XDG_CONFIG_DIRS");
     if (result == 0)
       {
+#ifndef __MINGW32__
         result = "/etc";
+#else
+        result = "c:";
+#endif
           /* note spec actually says default should be /etc/xdg, but /etc is the
             conventional location for system config files. */
       } /*if*/

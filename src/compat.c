@@ -8,7 +8,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <locale.h>
+#ifndef __MINGW32__
 #include <langinfo.h>
+#endif
 
 /*
     Useful string stuff

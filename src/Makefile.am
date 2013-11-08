@@ -19,7 +19,7 @@ dvdauthor_SOURCES = dvdauthor.c common.h dvdauthor.h da-internal.h \
 dvdauthor_LDADD = $(LIBICONV) $(XML_LIBS)
 
 dvdunauthor_SOURCES = dvdunauthor.c dvduncompile.c common.h dvduncompile.h compat.c compat.h
-dvdunauthor_LDADD = $(XML_LIBS) $(LIBICONV) -ldvdread
+dvdunauthor_LDADD = $(XML_LIBS) $(LIBICONV) $(DVDREAD_LIBS)
 
 spumux_SOURCES = subgen.c subgen.h rgb.h \
     subgen-parse-xml.c readxml.c readxml.h \
@@ -27,14 +27,14 @@ spumux_SOURCES = subgen.c subgen.h rgb.h \
     conffile.c conffile.h compat.c compat.h common.h \
     subrender.c subrender.h subreader.c subreader.h subfont.c subfont.h
 spumux_LDADD = $(XML_LIBS) $(MAGICK_LIBS) $(FREETYPE_LIBS) \
-    $(FRIBIDI_LIBS) $(FONTCONFIG_LIBS) $(LIBICONV) -lm
+    $(FRIBIDI_LIBS) $(FONTCONFIG_LIBS) $(LIBICONV) -lm $(WINSOCK)
 
 spuunmux_SOURCES = spuunmux.c rgb.h compat.c compat.h common.h conffile.h conffile.c
 spuunmux_CFLAGS = @LIBPNG_CFLAGS@ $(AM_CFLAGS)
-spuunmux_LDADD = $(LIBICONV) @LIBPNG_LIBS@
+spuunmux_LDADD = $(LIBICONV) @LIBPNG_LIBS@ -lz $(WINSOCK)
 
 mpeg2desc_SOURCES = common.h mpeg2desc.c compat.c
-mpeg2desc_LDADD = $(LIBICONV)
+mpeg2desc_LDADD = $(LIBICONV) $(WINSOCK)
 
 edit = sed \
     -e 's,@sysconfdir\@,$(sysconfdir),g' \
@@ -53,9 +53,6 @@ dvddirdel: $(srcdir)/dvddirdel.in config.h
 EXTRA_DIST = dvdvml.l dvdvmy.y dvddirdel.in
 MOSTLYCLEANFILES = dvddirdel
 MAINTAINERCLEANFILES = dvdvml.c dvdvmy.c dvdvmy.h
-
-FLEX = flex
-BISON = bison
 
 dvdvml.c: dvdvml.l
 	$(FLEX) -s -B -Cem -o$@ -Pdvdvm $<

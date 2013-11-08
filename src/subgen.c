@@ -33,7 +33,11 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#ifndef __MINGW32__
 #include <netinet/in.h>
+#else
+#include <winsock.h>
+#endif
 
 #include "common.h"
 #include "conffile.h"

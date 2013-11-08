@@ -30,7 +30,13 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifndef __MINGW32__
 #include <sys/times.h>
+#else
+typedef int32_t clock_t;
+#define sysconf(a) 1
+#define times(a)   1
+#endif
 
 #include <dvdread/dvd_reader.h>
 #include <dvdread/ifo_types.h>
@@ -1080,7 +1086,9 @@ static void getVobs(dvd_reader_t *dvd, const ifo_handle_t *ifo, int titleset, in
     const cell_adr_t *cells;
     int numcells,i,j,totalsect,numsect;
     clock_t start,now,clkpsec;
+#ifndef __MINGW32__
     struct tms unused_tms;
+#endif
 
     cptr = titlef ? ifo->vts_c_adt : ifo->menu_c_adt;
     if (cptr)

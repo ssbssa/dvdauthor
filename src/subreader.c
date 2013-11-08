@@ -69,6 +69,10 @@
 /* Maximal length of line of a subtitle */
 #define LINE_LEN 1000
 
+#ifdef __MINGW32__
+#define bzero(a,b) memset((a),0,(b))
+#endif
+
 static float
   /* global state for mpsub subtitle format */
     mpsub_position = 0.0,

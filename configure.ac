@@ -4,6 +4,7 @@ AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_AUX_DIR(autotools)
 
 AM_INIT_AUTOMAKE
+AM_PROG_CC_C_O
 
 AC_PROG_INSTALL
 
@@ -19,7 +20,52 @@ AC_COMPILE_IFELSE(
 )
 
 have_dvdread=false
-AC_CHECK_LIB(dvdread, DVDOpenFile, have_dvdread=true)
+AC_CHECK_LIB(dvdread, DVDOpenFile, have_dvdread=true
+		DVDREAD_LIBS="-ldvdread")
+dnl test for libdvdcss
+if test "x$have_dvdread" != "xtrue"; then
+  have_dvdcss=false
+  AC_MSG_CHECKING([for dvdcss_interface_2 in -ldvdcss])
+  saved_LIBS="$LIBS"
+  LIBS="-ldvdcss $LIBS"
+  AC_TRY_LINK([#include <dvdcss/dvdcss.h>],
+    [if(!dvdcss_interface_2) { return 1; }],
+  [ AC_MSG_RESULT([yes])
+    have_dvdcss=true
+  ],
+  [ AC_MSG_RESULT([no]) ] )
+  if test "x$have_dvdcss" == "xtrue"; then
+    unset ac_cv_lib_dvdread_DVDOpenFile
+    AC_CHECK_LIB(dvdread, DVDOpenFile, have_dvdread=true
+                DVDREAD_LIBS="-ldvdread -ldvdcss")
+  fi
+  LIBS="$saved_LIBS"
+fi
+
+AC_MSG_CHECKING([for ntohl() in netinet/in.h])
+AC_TRY_LINK([#include <netinet/in.h>],
+  [if(!ntohl(0)) { return 1; }],
+  [ AC_MSG_RESULT([yes]) ],
+  [ AC_MSG_RESULT([no])
+    AC_MSG_CHECKING([for ntohl() in -lwsock32])
+    saved_LIBS="$LIBS"
+    LIBS="-lwsock32 $LIBS"
+    AC_TRY_LINK([#include <winsock.h>],
+        [if(!ntohl(0)) { return 1; }],
+    [ AC_MSG_RESULT([yes])
+      WINSOCK="-lwsock32"
+    ],
+    [ AC_MSG_ERROR([ntohl() needed]) ] )
+    #[ AC_MSG_RESULT([no]) ] )
+    LIBS="$saved_LIBS"
+  ] )
+
+
+AC_SUBST(DVDREAD_LIBS)
+AC_SUBST(WINSOCK)
+
+AC_CHECK_PROGS(DOCBOOK2MAN, [docbook2man])
+AM_CONDITIONAL(HAVE_DOCBOOK2MAN, test -n "$DOCBOOK2MAN")
 
 AC_CHECK_LIB(gnugetopt, getopt_long)
 
@@ -83,6 +129,9 @@ fi
 
 AC_SUBST(MAGICK_CPPFLAGS)
 AC_SUBST(MAGICK_LIBS)
+
+AC_CHECK_PROGS(BISON, [bison])
+AC_CHECK_PROGS(FLEX, [flex])
 
 PKG_CHECK_MODULES([FONTCONFIG], [fontconfig], [AC_DEFINE(HAVE_FONTCONFIG, 1, [whether Fontconfig is available])], [:])
 AC_SUBST(FONTCONFIG_CFLAGS)

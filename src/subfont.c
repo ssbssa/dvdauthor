@@ -44,7 +44,11 @@
 
 #include <math.h>
 
+#ifndef __MINGW32__
 #include <netinet/in.h>
+#else
+#include <winsock.h>
+#endif
 
 #include "subglobals.h"
 #include "subfont.h"
@@ -136,7 +140,9 @@ static char *get_config_path(const char *filename)
     if ((homedir = getenv("HOME")) == NULL)
 #if defined(__MINGW32__) || defined(__CYGWIN__) /*hack to get fonts etc. loaded outside of cygwin environment*/
       {
+#ifndef __MINGW32__
         extern int __stdcall GetModuleFileNameA(void* hModule, char* lpFilename, int nSize);
+#endif
         int i, imax = 0;
         GetModuleFileNameA(NULL, exedir, sizeof exedir);
         for (i = 0; i<   strlen(exedir); i++)

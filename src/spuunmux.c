@@ -37,7 +37,11 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#ifndef __MINGW32__
 #include <netinet/in.h>
+#else
+#include <winsock.h>
+#endif
 
 #include <png.h>
 #include <zlib.h>

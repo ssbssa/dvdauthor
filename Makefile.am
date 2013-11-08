@@ -1,4 +1,8 @@
+if HAVE_DOCBOOK2MAN
 SUBDIRS = doc src
+else
+SUBDIRS = src
+endif
 
 noinst_DATA = dvdauthor.spec
 
