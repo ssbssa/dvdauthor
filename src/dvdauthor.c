@@ -20,8 +20,6 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
-
 #include "compat.h"
 
 #include <sys/types.h>
@@ -429,7 +427,7 @@ int vobgroup_set_video_attr(struct vobgroup *va,int attr,const char *s)
             v = 384;
         else
             v = 383;
-       
+
         if (h > 704)
             r = VS_720H;
         else if (h > 352)
@@ -944,7 +942,7 @@ noinfer:
         int j, k;
         bool fnd;
         fnd = false;
-        for (j = 0; j < va->numallpgcs; j++) 
+        for (j = 0; j < va->numallpgcs; j++)
             for (k = 0; k < 4; k++)
                 if (va->allpgcs[j]->subpmap[i][k])
                     fnd = true;
@@ -1067,13 +1065,19 @@ static char *makevtsdir(const char *s)
   /* returns the full pathname of the VIDEO_TS subdirectory within s if non-NULL,
     else returns NULL. */
 {
-    static char fbuf[1000];
-
-    if( !s )
-        return 0;
-    strcpy(fbuf,s);
-    strcat(fbuf,"/VIDEO_TS");
-    return strdup(fbuf);
+    static const char * subdir = "/VIDEO_TS";
+    char * fbuf;
+    if (s != NULL)
+      {
+        fbuf = malloc(strlen(s) + strlen(subdir) + 1);
+        sprintf(fbuf, "%s%s", s, subdir);
+      }
+    else
+      {
+        fbuf = NULL;
+      } /*if*/
+    return
+        fbuf;
 }
 
 // jumppad requires the existence of a menu to operate
@@ -1440,10 +1444,11 @@ static void validatesummary(struct pgcgroup *va)
 
     for( i=0; i<va->numpgcs; i++ ) {
         struct pgc *p=va->pgcs[i];
+      /* why is this being done? let user specify it if they want
         if( !p->posti && p->numsources ) {
             struct source *s=p->sources[p->numsources-1];
             s->cells[s->numcells-1].pauselen=255;
-        }
+        } */
         if( va->allentries & p->entries ) {
           /* this pgc adds entry menus already seen */
             int j;

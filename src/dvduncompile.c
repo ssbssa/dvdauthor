@@ -11,7 +11,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, 
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -22,7 +22,6 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
 #include "compat.h"
 
 #include <stdio.h>
@@ -515,7 +514,7 @@ static void print_jump_instruction(cmd_t *cmd)
                   (
                     stderr,
                     "WARN: Title not 1 as expected:  jump titleset %" PRIu8
-                        " menu entry %s; /* title=%" PRIu8 " */", 
+                        " menu entry %s; /* title=%" PRIu8 " */",
                     bits(cmd, 4, 0, 8),
                     entries[bits(cmd, 5, 4, 4)],
                     bits(cmd, 3, 0, 8)
@@ -523,7 +522,7 @@ static void print_jump_instruction(cmd_t *cmd)
               } /*if*/
             node_printf
               (
-                "jump titleset %" PRIu8 " menu entry %s;", 
+                "jump titleset %" PRIu8 " menu entry %s;",
                 bits(cmd, 4, 0, 8),
                 entries[bits(cmd, 5, 4, 4)]
               );

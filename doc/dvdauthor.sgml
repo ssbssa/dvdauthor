@@ -204,7 +204,7 @@ LANGUAGE DESCRIPTION for the format of <replaceable>commandlist.</replaceable></
 Here is the basic structure of the control file:
 </para>
 <synopsis>
-&lt;dvdauthor [dest="<replaceable>output-dir</replaceable>"] [jumppad="1|on|yes" | allgprm="1|on|yes"] [format="ntsc|pal"]&gt;
+&lt;dvdauthor [dest="<replaceable>output-dir</replaceable>"] [jumppad="1|on|yes" | allgprm="1|on|yes"] [format="ntsc|pal"] [provider="<replaceable>provider</replaceable>"]&gt;
    &lt;vmgm&gt;
       [&lt;fpc&gt;<replaceable>commands;</replaceable>&lt;/fpc&gt;]
       &lt;menus [lang="<replaceable>language-code</replaceable>"]&gt;
@@ -275,7 +275,7 @@ A breakdown of the control file:
 
 <variablelist>
 
-<varlistentry><term><literal>&lt;dvdauthor [dest="<replaceable>output-dir</replaceable>"] [jumppad="1|on|yes" | allgprm="1|on|yes"]&gt;</literal></term>
+<varlistentry><term><literal>&lt;dvdauthor [dest="<replaceable>output-dir</replaceable>"] [jumppad="1|on|yes" | allgprm="1|on|yes"] [format="ntsc|pal"] [provider="<replaceable>provider</replaceable>"]&gt;</literal></term>
 <listitem><para>
 Initiates dvdauthor.  <literal>dest</literal> denotes the directory where <command>dvdauthor</command> will write the files. This is overridden by the <literal>-o</literal> option. Contains up to one <literal>&lt;vmgm&gt;</literal> tag and any number of <literal>&lt;titleset&gt;</literal>'s.
 </para></listitem></varlistentry>
@@ -539,7 +539,7 @@ in a &lt;![CDATA[ ... ]]&gt; section.</para>
 <variablelist>
 
 <varlistentry><term><literal>random(<replaceable>EXPRESSION</replaceable>)</literal></term>
-<listitem><para>Computes a psuedo-random number, between 1 and the
+<listitem><para>Computes a pseudo-random number, between 1 and the
 supplied number, inclusively.</para> </listitem></varlistentry>
 
 </variablelist>
@@ -621,6 +621,10 @@ chapters):</para>
 starts at 1.  All of the titles on the disc are accessible in the VMGM
 domain, or you can access them by titleset
 instead.</para></listitem></varlistentry>
+
+<varlistentry>
+<term><literal>pgc <replaceable>Z</replaceable></literal></term>
+<listitem><para>Targets a PGC in the current VMGM or titleset.</para></listitem></varlistentry>
 
 <varlistentry>
 <term><literal>chapter <replaceable>Z</replaceable></literal></term>

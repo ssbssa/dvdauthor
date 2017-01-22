@@ -20,8 +20,6 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
-
 #include "compat.h"
 
 #include <assert.h>
@@ -247,7 +245,7 @@ static unsigned int getsect
           jumpvobunum < 0
       ||
           jumpvobunum >= va->numvobus
-      || 
+      ||
           va->vobu[jumpvobunum].vobcellid != va->vobu[curvobunum].vobcellid
             /* never cross cells */
       )
@@ -624,7 +622,7 @@ static void scanvideoptr
                     fprintf(stderr,"WARN: unknown mpeg1 aspect ratio %d\n",aspect);
                 break;
                   } /*switch*/
-                newaspect = 
+                newaspect =
                         3
                     +
                         (va->vd.vaspect == VA_4x3) * 5
@@ -688,7 +686,7 @@ static void scanvideoptr
               } /*switch*/
         break;
           } /* case MPID_EXTENSION */
-            
+
         case MPID_SEQUENCE_END:
             thisvi->hasseqend = 1;
         break;
@@ -1137,7 +1135,7 @@ int FindVobus(const char *fbase, struct vobgroup *va, vtypes ismenu)
         unsigned char buf[6]; /* save partial packet in case it crosses sector boundaries */
       } mp2hdr[8]; /* enough for the allowed 8 audio streams */
     struct colorremap *crs;
-    
+
     crs = malloc(sizeof(struct colorremap) * 32); /* enough for 32 subpicture streams */
     for (vnum = 0; vnum < va->numvobs; vnum++)
       {
@@ -1341,7 +1339,7 @@ int FindVobus(const char *fbase, struct vobgroup *va, vtypes ismenu)
 
                   } /*case 1*/
                 break;
-                        
+
                 default:
                     fprintf
                       (
@@ -1425,15 +1423,20 @@ int FindVobus(const char *fbase, struct vobgroup *va, vtypes ismenu)
             if (fsect == -1)
               {
               /* start a new VOB file */
-                char newname[200];
                 fsect = 0;
                 if (fbase)
                   {
+                    char * newname;
                     if (outnum >= 0)
-                        sprintf(newname, "%s_%d.VOB", fbase, outnum);
+                      {
+                        newname = sprintf_alloc("%s_%d.VOB", fbase, outnum);
+                      }
                     else
-                        strcpy(newname, fbase);
+                      {
+                        newname = strdup(fbase);
+                      } /*if*/
                     writeopen(newname);
+                    free(newname);
                   } /*if*/
               } /*if*/
             if
@@ -2281,16 +2284,20 @@ void FixVobus(const char *fbase,const struct vobgroup *va,const struct workset *
             if (thisvobu->fnum != fnum)
               {
               /* time to start a new output file */
-                char fname[200];
                 if (outvob >= 0)
                     flushclose(outvob);
                 fnum = thisvobu->fnum;
                 if (fbase)
                   {
+                    char * fname;
                     if (fnum == -1)
-                        strcpy(fname, fbase);
+                      {
+                        fname = strdup(fbase);
+                      }
                     else
-                        sprintf(fname, "%s_%d.VOB", fbase, fnum);
+                      {
+                        fname = sprintf_alloc("%s_%d.VOB", fbase, fnum);
+                      } /*if*/
                     outvob = open(fname, O_WRONLY | O_BINARY);
                     if (outvob < 0)
                       {
@@ -2304,6 +2311,7 @@ void FixVobus(const char *fbase,const struct vobgroup *va,const struct workset *
                           );
                         exit(1);
                       } /*if*/
+                    free(fname);
                   } /*if*/
               } /*if*/
 
@@ -2335,7 +2343,7 @@ void FixVobus(const char *fbase,const struct vobgroup *va,const struct workset *
                   ) // total guess
               );
               /* c_eltm -- BCD cell elapsed time + frame rate */
-                
+
             if (thisvob->progchain->numbuttons)
               {
               /* fill in PCI packet with button info */
@@ -2517,7 +2525,7 @@ void FixVobus(const char *fbase,const struct vobgroup *va,const struct workset *
                     if
                       (
                             id >= 0
-                        && 
+                        &&
                             ach->audpts[id].pts[0] < thisvobu->sectpts[1]
                         &&
                             ach->audpts[id].pts[1] >= thisvobu->sectpts[0]
@@ -2632,4 +2640,3 @@ void FixVobus(const char *fbase,const struct vobgroup *va,const struct workset *
         fprintf(stderr, "STAT: fixed %d VOBUs                         ", totvob);
     fprintf(stderr, "\n");
   } /*FixVobus*/
-

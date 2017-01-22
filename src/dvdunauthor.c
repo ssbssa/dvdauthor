@@ -23,20 +23,12 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
-
 #include "compat.h"
 
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#ifndef __MINGW32__
-#include <sys/times.h>
-#else
-typedef int32_t clock_t;
-#define sysconf(a) 1
-#define times(a)   1
-#endif
+#include <time.h>
 
 #include <dvdread/dvd_reader.h>
 #include <dvdread/ifo_types.h>
@@ -497,7 +489,7 @@ static int setvob(unsigned char **vobs, int *numvobs, int vob)
     return r;
   } /*setvob*/
 
-static void FindWith(xmlNodePtr angleNode, const pgcit_t *pgcs, int vob, const cell_playback_t *cp)
+static void FindWith(xmlNodePtr angleNode, const pgcit_t *pgcs, unsigned int vob, const cell_playback_t *cp)
   /* handles interleaving of different titles as an alternative to an angle block. */
   {
     int i, j;
@@ -1007,7 +999,7 @@ static void writepalette(int h, const uint32_t *palette)
         wdbyte(1); // colormap
         wdbyte(16); // number of colors
         for (i = 0; i < 16; i++)
-          {  
+          {
             wdbyte(palette[i] >> 16);
             wdbyte(palette[i] >> 8);
             wdbyte(palette[i]);
@@ -1048,7 +1040,7 @@ static void writebutton(int h, const unsigned char *packhdr, const hli_t *hli)
     wdbyte(3);
     for (i = 0; i < 6; i++)
         wdlong(hli->btn_colit.btn_coli[i >> 1][i & 1]);
-    
+
     wdbyte(3); // btn_it
     wdbyte(hli->hl_gi.btn_ns);
     for (i = 0; i < hli->hl_gi.btn_ns; i++)
@@ -1070,7 +1062,7 @@ static void writebutton(int h, const unsigned char *packhdr, const hli_t *hli)
         sprintf(nm1, "%d", b->left);  wdstr(nm1);
         sprintf(nm1, "%d", b->right); wdstr(nm1);
       } /*for*/
-    
+
     if (write(h, sector, 2048) < 2048)
       {
         fprintf(stderr, "ERR:  Error %d writing data: %s\n", errno, strerror(errno));
@@ -1084,11 +1076,8 @@ static void getVobs(dvd_reader_t *dvd, const ifo_handle_t *ifo, int titleset, in
     dvd_file_t *vobs;
     const c_adt_t *cptr;
     const cell_adr_t *cells;
-    int numcells,i,j,totalsect,numsect;
-    clock_t start,now,clkpsec;
-#ifndef __MINGW32__
-    struct tms unused_tms;
-#endif
+    unsigned int numcells,i,j,totalsect,numsect;
+    time_t start,now;
 
     cptr = titlef ? ifo->vts_c_adt : ifo->menu_c_adt;
     if (cptr)
@@ -1106,17 +1095,25 @@ static void getVobs(dvd_reader_t *dvd, const ifo_handle_t *ifo, int titleset, in
     vobs = DVDOpenFile(dvd, titleset, titlef ? DVD_READ_TITLE_VOBS : DVD_READ_MENU_VOBS);
     if (vobs == NULL)
       {
-      /* error message already output */
-        exit(1);
+        fprintf(stderr, "INFO: No VOBs found for ");
+        if (titleset != 0)
+          {
+            fprintf(stderr, "titleset %d %s", titleset, titlef ? "title" : "menu");
+          }
+        else
+          {
+            fprintf(stderr, "VMGM");
+          } /*if*/
+        fprintf(stderr, "\n");
+        return;
       } /*if*/
 
     numsect = 0;
     totalsect = 0;
     for (i = 0; i < numcells; i++)
         totalsect += cells[i].last_sector - cells[i].start_sector + 1;
-    clkpsec = sysconf(_SC_CLK_TCK);
-    start = times(&unused_tms);
-    
+    start = time(NULL);
+
     for (i = 0; i < numcells; i++)
       {
         int h, b, plen;
@@ -1167,10 +1164,10 @@ static void getVobs(dvd_reader_t *dvd, const ifo_handle_t *ifo, int titleset, in
             int rl = cells[i].last_sector + 1 - b;
             if (rl > BIGBLOCKSECT)
                 rl = BIGBLOCKSECT;
-            now = times(&unused_tms);
-            if (now-start > 3 * clkpsec && numsect > 0)
+            now = time(NULL);
+            if (difftime(now,start) > 3.0 && numsect > 0)
               {
-                const int rmn = (totalsect - numsect) * (now - start) / (numsect * clkpsec);
+                const int rmn = (totalsect - numsect) * (now - start) / numsect;
                   /* estimate of time remaining */
                 fprintf
                   (
@@ -1232,7 +1229,7 @@ static void getVobs(dvd_reader_t *dvd, const ifo_handle_t *ifo, int titleset, in
                   /* looks like a NAV pack */
                     pci_t p;
                     //dsi_t d;
-                    
+
                     navRead_PCI(&p, bigblock + j * DVD_VIDEO_LB_LEN + 0x2d);
                     //navRead_DSI(&d,bigblock+j*DVD_VIDEO_LB_LEN+0x407);
 
@@ -1311,7 +1308,7 @@ static void dump_dvd
   )
   {
     ifo_handle_t *ifo;
- 
+
     if (titleset < 0 || titleset > 99)
       {
         fprintf(stderr, "ERR:  Can only handle titlesets 0..99\n");
@@ -1452,7 +1449,7 @@ int main(int argc, char **argv)
     mainNode = xmlNewDocNode(myXmlDoc, NULL, (xmlChar *)"dvdauthor", NULL);
     xmlDocSetRootElement(myXmlDoc, mainNode);
     xmlNewProp(mainNode, (const xmlChar *)"allgprm", (const xmlChar *)"yes");
-      
+
     for (i = 0; i <= numtitlesets; i++)
       {
         if (i)
@@ -1476,7 +1473,7 @@ int main(int argc, char **argv)
             dump_dvd(dvd, i, 1, titlesetNode);
           } /*if*/
       } /*for*/
-     
+
     xmlSaveFormatFile("dvdauthor.xml", myXmlDoc, 1);
     xmlFreeDoc(myXmlDoc);
 

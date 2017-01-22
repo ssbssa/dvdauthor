@@ -31,7 +31,6 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
 #include "compat.h"
 
 #include <fcntl.h>
@@ -802,7 +801,7 @@ static void write_menu_image
         map[i + 1].y2 = d->buttons[i].y2;
         map[i + 1].color = cc >> 16;
         map[i + 1].contrast = cc;
-      } /*for*/    
+      } /*for*/
     sprintf((char *)nbuf, "%s%05d%c.png", base_name, s->subno, type[0]);
     if (!write_png((char *)nbuf, s, map, nummap))
       {
@@ -994,7 +993,7 @@ static int svcddecode()
       } /*if*/
     ofs = i + 2 - 1; // get_next_svcdbits will increment ofs by 1
     ofs1 = ofs + read2(sub + i);
-    i += 2;
+  /* i += 2; */ /* not further used */
     if (debug > 4)
         fprintf(stderr, "cmd: image offsets 0x%x 0x%x\n", ofs, ofs1);
     have_bits = 0;
@@ -1103,7 +1102,6 @@ int main(int argc, char **argv)
     base_name = "sub";
     stream_number = 0;
     palet_file = 0;
-    nrinfiles = 0;
     while ((option = getopt(argc, argv, "o:v:fF:s:p:Vh")) != -1)
       {
         switch (option)
@@ -1193,7 +1191,7 @@ int main(int argc, char **argv)
           {
             if (strcmp(temp, ".rgb") == 0)
                 rgb = true;
-          } /*if*/        
+          } /*if*/
         fdo = fopen(palet_file, "r");
         if (fdo != NULL)
           {

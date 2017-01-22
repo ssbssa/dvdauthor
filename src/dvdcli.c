@@ -35,6 +35,7 @@
 #include "rgb.h"
 
 int default_video_format = VF_NONE;
+char provider_str[PROVIDER_SIZE];
 
 /* common parsing bits for both command line and XML file */
 
@@ -207,7 +208,7 @@ static void readpalette(struct pgc *p,const char *fname)
     struct vfile h;
 
     h=varied_open(fname, O_RDONLY, "palette file");
-    
+
     /* write out colors, the hex is the 0yuv combined in one integer 00yyuuvv */
     i=strlen(fname);
     rgbf=( i>=4 && !strcasecmp(fname+i-4,".rgb") );
@@ -489,7 +490,7 @@ int main(int argc, char **argv)
         case 'O':
             delete_output_dir = true;
         /* and fallthru */
-        case 'o': 
+        case 'o':
             fbase = optarg;
         break;
 
@@ -513,13 +514,13 @@ int main(int argc, char **argv)
             hadchapter = chapters_neither; /* reset for new title */
             istitle = true;
         break;
-            
+
         case 'a':
             NOXML
             MAINDEF
             parseaudioopts(va[istitle], optarg);
         break;
-        
+
         case 'v':
             NOXML
             MAINDEF
@@ -820,6 +821,15 @@ static void dvdauthor_video_format
       } /*if*/
   } /*dvdauthor_video_format*/
 
+static void dvdauthor_provider
+  (
+    const char * s
+  )
+  {
+    strncpy(provider_str, s, PROVIDER_SIZE);
+    provider_str[PROVIDER_SIZE - 1] = 0;
+  } /*dvdauthor_provider*/
+
 static void getfbase()
   {
     if (!writeoutput)
@@ -831,7 +841,13 @@ static void getfbase()
       } /*if*/
   } /*getfbase*/
 
-static void dvdauthor_end()
+static void dvdauthor_start(void)
+  {
+    strncpy(provider_str, PACKAGE_STRING, PROVIDER_SIZE);
+    provider_str[PROVIDER_SIZE - 1] = 0;
+  } /*dvdauthor_start*/
+
+static void dvdauthor_end(void)
 /* called on </dvdauthor> end tag, generates the VMGM if specified.
   This needs to be done after all the titles, so it can include
   information about them. */
@@ -1052,7 +1068,7 @@ static void audio_channels(const char *c)
         ch[3] = 0;
         c = ch;
       } /*if*/
-    set_audio_attr(AUDIO_CHANNELS, ch, setaudio);
+    set_audio_attr(AUDIO_CHANNELS, c, setaudio);
   }
 
 static void subattr_group_start()
@@ -1221,6 +1237,7 @@ static void vob_file(const char *f)
 {
     f = localize_filename(f);
     source_set_filename(curvob, f);
+    free(f);
 }
 
 static void vob_chapters(const char *c)
@@ -1284,11 +1301,21 @@ static void cell_start()
 
 static void cell_parsestart(const char *f)
   {
+    if (f[0] == 0)
+      {
+        fprintf(stderr,"ERR:  Empty cell start time\n");
+        exit(1);
+      } /*if*/
     cell_starttime = parsechapter(f);
   }
 
 static void cell_parseend(const char *f)
   {
+    if (f[0] == 0)
+      {
+        fprintf(stderr,"ERR:  Empty cell end time\n");
+        exit(1);
+      } /*if*/
     cell_endtime = parsechapter(f);
   }
 
@@ -1334,7 +1361,7 @@ static void button_end()
 }
 
 static struct elemdesc elems[]={
-    {"dvdauthor", DA_BEGIN,   DA_ROOT,    0,               dvdauthor_end},
+    {"dvdauthor", DA_BEGIN,   DA_ROOT,    dvdauthor_start, dvdauthor_end},
     {"titleset",  DA_ROOT,    DA_SET,     titleset_start,  titleset_end},
     {"vmgm",      DA_ROOT,    DA_SET,     vmgm_start,      vmgm_end},
     {"fpc",       DA_SET,     DA_NOSUB,   fpc_start,       fpc_end},
@@ -1359,6 +1386,7 @@ static struct elemattr attrs[]={
     {"dvdauthor","jumppad",dvdauthor_jumppad},
     {"dvdauthor","allgprm",dvdauthor_allgprm},
     {"dvdauthor","format",dvdauthor_video_format},
+    {"dvdauthor","provider",dvdauthor_provider},
 
     {"menus","lang",menus_lang},
 

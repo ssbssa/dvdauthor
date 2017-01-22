@@ -1,4 +1,13 @@
-0.7.1+: ??
+0.7.2: 2016 December 31
+	Various code-quality and build improvements
+	Support “jump pgc n” and other interaction code-generation improvements
+	Improve reliability of dvdunauthor
+	Don’t force infinite pause on last cell of a PGC
+	Allow specification of provider field in VMG IFO file
+	Add video_format(7) man page
+	Add padding to ensure .BUP and .IFO files end up in different ECC blocks
+	Enabled hinting of rendered subtitle text
+	Require cell start and end times (if specified) to be nonempty
 
 0.7.1: 2012 August 20
 	No longer silently fail to build dvdunauthor if libdvdread is not present;

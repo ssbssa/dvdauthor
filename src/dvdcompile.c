@@ -20,8 +20,6 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
-
 #include "compat.h"
 #include <assert.h>
 
@@ -160,7 +158,7 @@ static unsigned char *compileexpr(unsigned char *buf, int target, struct vm_stat
     Returns pointer to after generated code. */
   {
     struct vm_statement *v, **vp;
-    int isassoc, canusesprm;
+    bool isassoc, canusesprm;
     if (cs->op == VM_VAL) /* simple value reference */
         return compileop(buf, target, VM_VAL, cs->i1); /* assign value to target */
 
@@ -177,9 +175,9 @@ static unsigned char *compileexpr(unsigned char *buf, int target, struct vm_stat
     canusesprm = cs->op == VM_AND || cs->op == VM_OR || cs->op == VM_XOR;
       /* operations where the source may be an SPRM (also VM_VAL, but that was already dealt with) */
 
-    // if the target is an operator, move it to the front
     if (isassoc)
       {
+      /* if one of the source operands is the destination register, move it to the front */
         for (vp = &cs->param->next; *vp; vp = &(vp[0]->next))
             if (vp[0]->op == VM_VAL && vp[0]->i1 == target - 256)
               {
@@ -209,13 +207,12 @@ static unsigned char *compileexpr(unsigned char *buf, int target, struct vm_stat
           } /*if*/
         return buf;
       } /*if*/
-        
+
     if (isassoc && cs->param->op == VM_VAL && cs->param->i1 != target - 256)
-      /* fixme: should "isassoc" be "canusesprm" instead? */
       {
         // if the first param is a value, then try to move a complex operation farther up or an SPRM access (if SPRM ops are not allowed)
         for (vp = &cs->param->next; *vp; vp = &(vp[0]->next))
-            if (vp[0]->op != VM_VAL || issprmval(vp[0]))
+            if (vp[0]->op != VM_VAL || canusesprm < issprmval(vp[0]))
               {
                 v = *vp;
                 *vp = v->next; /* take out from its place in chain */
@@ -243,9 +240,9 @@ static unsigned char *compileexpr(unsigned char *buf, int target, struct vm_stat
       {
         for (v = cs->param->next; v; v = v->next) /* process chain of operations */
           {
-            if (v->op == VM_VAL && !issprmval(v))
+            if (v->op == VM_VAL && canusesprm >= issprmval(v))
                 buf = compileop(buf, target, cs->op, v->i1);
-                  /* can simply put value straight into target */
+                  /* can simply put function value straight into target */
             else
               {
                 const int t2 = nexttarget(target);
@@ -499,7 +496,7 @@ static unsigned char *compilecs
                     buf += 8;
                   } /*if*/
             break;
-                
+
             case 128 + 8: // button
                 if (cs->param->op == VM_VAL && !(cs->param->i1 >= -128 && cs->param->i1 < 0))
                   {
@@ -529,7 +526,7 @@ static unsigned char *compilecs
                     buf += 8;
                   } /*if*/
                 break;
-                
+
             default:
                 fprintf(stderr, "ERR:  Cannot set SPRM %d\n", cs->i1 - 128);
                 return 0;
@@ -595,7 +592,7 @@ static unsigned char *compilecs
             lastif = true; // make sure reference statement is generated
           }
         break;
-            
+
         case VM_GOTO:
             if (numgotos == MAXGOTOS)
               {
@@ -608,7 +605,7 @@ static unsigned char *compilecs
             write8(buf, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
             buf += 8;
         break;
-            
+
         case VM_BREAK:
             write8(buf, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
             buf += 8;
@@ -628,8 +625,8 @@ static unsigned char *compilecs
           {
             int i1 = cs->i1; /* if nonzero, 1 for VMGM, or titleset nr + 1 */
             int i2 = cs->i2; /* menu number or menu entry ID + 120 or title number + 128 */
-          /* cs->i3 is chapter number if nonzero and less than 65536;
-            or program number + 65536; or cell number + 131072 */
+          /* cs->i3 is PGC number if nonzero and less than 65536; or chapter number + 65536;
+            or program number + 131072; or cell number + 196608 */
 
           /* check for various disallowed combinations */
             if (i1 == 1 && ismenu == VTYPE_VMGM)
@@ -655,20 +652,20 @@ static unsigned char *compilecs
                     ismenu == VTYPE_VTS
               )
               {
-                //  VTS NONE    MPGC    NOCH
-                //  VTS VMGM    MPGC    NOCH
-                //  VTS TS  MPGC    NOCH
-                //  VTS NONE    MPGC    CHXX
-                //  VTS VMGM    MPGC    CHXX
-                //  VTS TS  MPGC    CHXX
-                //  VTS NONE    MEPGC   NOCH
-                //  VTS VMGM    MEPGC   NOCH
-                //  VTS TS  MEPGC   NOCH
-                //  VTS NONE    MEPGC   CHXX
-                //  VTS VMGM    MEPGC   CHXX
-                //  VTS TS  MEPGC   CHXX
-                //  VTS VMGM    NOPGC   NOCH
-                //  VTS VMGM    NOPGC   CHXX
+                //  VTS     NONE    MPGC    NOCH
+                //  VTS     VMGM    MPGC    NOCH
+                //  VTS     TS      MPGC    NOCH
+                //  VTS     NONE    MPGC    CHXX
+                //  VTS     VMGM    MPGC    CHXX
+                //  VTS     TS      MPGC    CHXX
+                //  VTS     NONE    MEPGC   NOCH
+                //  VTS     VMGM    MEPGC   NOCH
+                //  VTS     TS      MEPGC   NOCH
+                //  VTS     NONE    MEPGC   CHXX
+                //  VTS     VMGM    MEPGC   CHXX
+                //  VTS     TS      MEPGC   CHXX
+                //  VTS     VMGM    NOPGC   NOCH
+                //  VTS     VMGM    NOPGC   CHXX
 
                 fprintf(stderr, "ERR:  Cannot jump to a menu from a title, use 'call' instead\n");
                 return 0;
@@ -679,33 +676,33 @@ static unsigned char *compilecs
                 &&
                     i2 < 128 /* jump to non-entry menu */
                 &&
-                    cs->i3 /* chapter/cell/program specified */
+                    (cs->i3 & 65535) /* PGC/chapter/cell/program specified */
                 &&
                     ismenu != VTYPE_VTS
               )
               {
                 //  VMGM    NONE    MPGC    CHXX
-                //  VMGM    TS  MPGC    CHXX
+                //  VMGM    TS      MPGC    CHXX
                 //  VMGM    NONE    MEPGC   CHXX
-                //  VMGM    TS  MEPGC   CHXX
+                //  VMGM    TS      MEPGC   CHXX
                 //  VTSM    NONE    MPGC    CHXX
                 //  VTSM    VMGM    MPGC    CHXX
-                //  VTSM    TS  MPGC    CHXX
+                //  VTSM    TS      MPGC    CHXX
                 //  VTSM    NONE    MEPGC   CHXX
                 //  VTSM    VMGM    MEPGC   CHXX
-                //  VTSM    TS  MEPGC   CHXX
+                //  VTSM    TS      MEPGC   CHXX
                 fprintf(stderr, "ERR:  Cannot specify chapter when jumping to another menu\n");
                 return 0;
               } /*if*/
             if (i1 /*VMGM/titleset*/ && !i2 /*no PGC*/)
               {
                 //  VTSM    VMGM    NOPGC   CHXX
-                //  VTS TS  NOPGC   CHXX
-                //  VTSM    TS  NOPGC   CHXX
-                //  VMGM    TS  NOPGC   CHXX
-                //  VTS TS  NOPGC   NOCH
-                //  VTSM    TS  NOPGC   NOCH
-                //  VMGM    TS  NOPGC   NOCH
+                //  VTS     TS      NOPGC   CHXX
+                //  VTSM    TS      NOPGC   CHXX
+                //  VMGM    TS      NOPGC   CHXX
+                //  VTS     TS      NOPGC   NOCH
+                //  VTSM    TS      NOPGC   NOCH
+                //  VMGM    TS      NOPGC   NOCH
                 fprintf(stderr, "ERR:  Cannot omit menu/title if specifying vmgm/titleset\n");
                 return 0;
               } /*if*/
@@ -715,10 +712,10 @@ static unsigned char *compilecs
                 &&
                     !i2 /*same PGC*/
                 &&
-                    !cs->i3 /*no chapter/cell/program*/
+                    !(cs->i3 & 65535) /*no PGC/chapter/cell/program*/
               )
               {
-                //  VTS NONE    NOPGC   NOCH
+                //  VTS     NONE    NOPGC   NOCH
                 //  VTSM    NONE    NOPGC   NOCH
                 //  VMGM    NONE    NOPGC   NOCH
                 fprintf(stderr, "ERR:  Nop jump statement\n");
@@ -749,8 +746,8 @@ static unsigned char *compilecs
                     i2 < 128 /*entry PGC*/
               )
               {
-                //  VTSM    TS  MEPGC   NOCH
-                //  VMGM    TS  MEPGC   NOCH
+                //  VTSM    TS      MEPGC   NOCH
+                //  VMGM    TS      MEPGC   NOCH
                 if (i2 == 120) /* "default" entry means "root" */
                     i2 = 123;
                 write8(buf, 0x30, 0x06, 0x00, 0x01, i1 - 1, 0x80 + (i2 - 120), 0x00, 0x00); buf += 8; // JumpSS VTSM vts 1 menu
@@ -761,20 +758,20 @@ static unsigned char *compilecs
               ||
                   i1 == 1 /*jump to VMGM*/ && i2 >= 128 /*title*/
               ||
-                  ismenu == VTYPE_VMGM && i2 >= 128 /*title*/ && cs->i3 /*chapter/program/cell*/
+                  ismenu == VTYPE_VMGM && i2 >= 128 /*title*/ && (cs->i3 & 65535) != 0 /*chapter/program/cell*/
               )
               {
-                //  VMGM    TS  TPGC    CHXX
-                //  VTSM    TS  MPGC    NOCH
-                //  VMGM    TS  MPGC    NOCH
-                //  VTS TS  TPGC    NOCH
-                //  VTSM    TS  TPGC    NOCH
-                //  VMGM    TS  TPGC    NOCH
-                //  VTS TS  TPGC    CHXX
-                //  VTSM    TS  TPGC    CHXX
-                //  VTS VMGM    TPGC    NOCH
+                //  VMGM    TS      TPGC    CHXX
+                //  VTSM    TS      MPGC    NOCH
+                //  VMGM    TS      MPGC    NOCH
+                //  VTS     TS      TPGC    NOCH
+                //  VTSM    TS      TPGC    NOCH
+                //  VMGM    TS      TPGC    NOCH
+                //  VTS     TS      TPGC    CHXX
+                //  VTSM    TS      TPGC    CHXX
+                //  VTS     VMGM    TPGC    NOCH
                 //  VTSM    VMGM    TPGC    NOCH
-                //  VTS VMGM    TPGC    CHXX
+                //  VTS     VMGM    TPGC    CHXX
                 //  VTSM    VMGM    TPGC    CHXX
                 //  VMGM    NONE    TPGC    CHXX
                 if (jumppad)
@@ -815,20 +812,20 @@ static unsigned char *compilecs
                     write8(buf, 0x30, 0x06, 0x00, 0x00, 0x00, i2 == 121 ? 0 : (0x40 + i2 - 120), 0x00, 0x00); // JumpSS FP or JumpSS VMGM menu
                 buf += 8;
               }
-            else if (!i1 && !i2 && cs->i3)
+            else if (!i1 && !i2 && (cs->i3 & 65535))
               {
                 int numc;
                 const char *des;
 
-                //  VTS NONE    NOPGC   CHXX
+                //  VTS     NONE    NOPGC   CHXX
                 //  VTSM    NONE    NOPGC   CHXX
                 //  VMGM    NONE    NOPGC   CHXX
                 if (curpgc == 0)
                   {
-                    fprintf(stderr, "ERR:  Cannot jump to a chapter from a FPC\n");
+                    fprintf(stderr, "ERR:  Cannot jump to a chapter from FPC\n");
                     return 0;
                   } /*if*/
-                if (cs->i3 < 65536 && ismenu != VTYPE_VTS)
+                if (cs->i3 >> 16 == 1 && ismenu != VTYPE_VTS)
                   {
                     fprintf(stderr, "ERR:  Menus do not have chapters\n");
                     return 0;
@@ -836,18 +833,22 @@ static unsigned char *compilecs
                 switch (cs->i3 >> 16)
                   {
                 case 0:
+                    numc = curgroup->numpgcs;
+                    des = "pgc";
+                break;
+                case 1:
                     numc = curpgc->numchapters;
                     des = "chapter";
                 break;
-                case 1:
+                case 2:
                     numc = curpgc->numprograms;
                     des = "program";
                 break;
-                case 2:
+                case 3:
                     numc = curpgc->numcells;
                     des = "cell";
                 break;
-                default:
+                default: /* shouldn't occur! */
                     numc = 0;
                     des = "<err>";
                 break;
@@ -857,7 +858,7 @@ static unsigned char *compilecs
                     fprintf(stderr, "ERR:  Cannot jump to %s %d, only %d exist\n", des, cs->i3 & 65535, numc);
                     return 0;
                   } /*if*/
-                write8(buf, 0x20, 0x05 + (cs->i3 >> 16), 0x00, 0x00, 0x00, 0x00, 0x00, cs->i3); // LinkPTTN pttn, LinkPGCN pgn, or LinkCN cn
+                write8(buf, 0x20, 0x04 + (cs->i3 >> 16), 0x00, 0x00, 0x00, 0x00, 0x00, cs->i3); // LinkPGCN pgcn, LinkPTTN pttn, LinkPGCN pgn, or LinkCN cn
                 buf += 8;
               }
             else if (i2 < 128) /* menu */
@@ -896,7 +897,7 @@ static unsigned char *compilecs
                   } /*if*/
                 if (ismenu == VTYPE_VMGM)
                   {
-                    // In case we are jumping from a FP to VMGM, we need to use a JumpSS
+                    // In case we are jumping from FP to VMGM, we need to use a JumpSS
                     // instruction
                     write8(buf, 0x30, 0x06, 0x00, i2 & 127, 0x00, 0xc0, 0x00, 0x00); // JumpSS VMGM pgcn
                   }
@@ -907,9 +908,9 @@ static unsigned char *compilecs
             else
               {
                 //  VMGM    NONE    TPGC    NOCH
-                //  VTS NONE    TPGC    NOCH
+                //  VTS     NONE    TPGC    NOCH
                 //  VTSM    NONE    TPGC    NOCH
-                //  VTS NONE    TPGC    CHXX
+                //  VTS     NONE    TPGC    CHXX
                 //  VTSM    NONE    TPGC    CHXX
                 if (ismenu < VTYPE_VMGM) /* VTS or VTSM */
                   {
@@ -924,13 +925,13 @@ static unsigned char *compilecs
                           );
                         return 0;
                       } /*if*/
-                    if (cs->i3 && cs->i3 > ws->titles->pgcs[i2 - 128 - 1]->numchapters)
+                    if ((cs->i3 & 65535) != 0 && (cs->i3 & 65535) > ws->titles->pgcs[i2 - 128 - 1]->numchapters)
                       {
                         fprintf
                           (
                             stderr,
                             "ERR:  Cannot jump to chapter %d of title %d, only %d exist\n",
-                            cs->i3,
+                            cs->i3 & 65535,
                             i2 - 128,
                             ws->titles->pgcs[i2 - 128 - 1]->numchapters
                           );
@@ -943,7 +944,7 @@ static unsigned char *compilecs
                     0x30,
                     ismenu == VTYPE_VMGM ?
                         0x02 /*JumpTT*/
-                    : cs->i3 ?
+                    : (cs->i3 & 65535) != 0 ?
                         0x05 /*JumpVTS_PTT*/
                     :
                         0x03 /*JumpVTS_TT*/,
@@ -963,63 +964,62 @@ static unsigned char *compilecs
           {
           /* cs->i1 if nonzero is 1 for VMGM, or titleset nr + 1 */
             int i2 = cs->i2; /* menu number or menu entry ID + 120 or title number + 128 */
-          /* cs->i3 is chapter number if nonzero and less than 65536;
-            or program number + 65536; or cell number + 131072 */
+          /* cs->i3 is chapter number if specified, else zero */
             int i4 = cs->i4; /* resume cell if specified, else zero */
 
             // CALL's from <post> MUST have a resume cell
             if (!i4)
-                i4 = 1;
+                i4 = 1; /* resume from start if not specified */
             if (ismenu != VTYPE_VTS)
               {
                 //  VTSM    NONE    NOPGC   NOCH
                 //  VMGM    NONE    NOPGC   NOCH
                 //  VTSM    VMGM    NOPGC   NOCH
                 //  VMGM    VMGM    NOPGC   NOCH
-                //  VTSM    TS  NOPGC   NOCH
-                //  VMGM    TS  NOPGC   NOCH
+                //  VTSM    TS      NOPGC   NOCH
+                //  VMGM    TS      NOPGC   NOCH
                 //  VTSM    NONE    NOPGC   CHXX
                 //  VMGM    NONE    NOPGC   CHXX
                 //  VTSM    VMGM    NOPGC   CHXX
                 //  VMGM    VMGM    NOPGC   CHXX
-                //  VTSM    TS  NOPGC   CHXX
-                //  VMGM    TS  NOPGC   CHXX
+                //  VTSM    TS      NOPGC   CHXX
+                //  VMGM    TS      NOPGC   CHXX
                 //  VTSM    NONE    MPGC    NOCH
                 //  VMGM    NONE    MPGC    NOCH
                 //  VTSM    VMGM    MPGC    NOCH
                 //  VMGM    VMGM    MPGC    NOCH
-                //  VTSM    TS  MPGC    NOCH
-                //  VMGM    TS  MPGC    NOCH
+                //  VTSM    TS      MPGC    NOCH
+                //  VMGM    TS      MPGC    NOCH
                 //  VTSM    NONE    MPGC    CHXX
                 //  VMGM    NONE    MPGC    CHXX
                 //  VTSM    VMGM    MPGC    CHXX
                 //  VMGM    VMGM    MPGC    CHXX
-                //  VTSM    TS  MPGC    CHXX
-                //  VMGM    TS  MPGC    CHXX
+                //  VTSM    TS      MPGC    CHXX
+                //  VMGM    TS      MPGC    CHXX
                 //  VTSM    NONE    MEPGC   NOCH
                 //  VMGM    NONE    MEPGC   NOCH
                 //  VTSM    VMGM    MEPGC   NOCH
                 //  VMGM    VMGM    MEPGC   NOCH
-                //  VTSM    TS  MEPGC   NOCH
-                //  VMGM    TS  MEPGC   NOCH
+                //  VTSM    TS      MEPGC   NOCH
+                //  VMGM    TS      MEPGC   NOCH
                 //  VTSM    NONE    MEPGC   CHXX
                 //  VMGM    NONE    MEPGC   CHXX
                 //  VTSM    VMGM    MEPGC   CHXX
                 //  VMGM    VMGM    MEPGC   CHXX
-                //  VTSM    TS  MEPGC   CHXX
-                //  VMGM    TS  MEPGC   CHXX
+                //  VTSM    TS      MEPGC   CHXX
+                //  VMGM    TS      MEPGC   CHXX
                 //  VTSM    NONE    TPGC    NOCH
                 //  VMGM    NONE    TPGC    NOCH
                 //  VTSM    VMGM    TPGC    NOCH
                 //  VMGM    VMGM    TPGC    NOCH
-                //  VTSM    TS  TPGC    NOCH
-                //  VMGM    TS  TPGC    NOCH
+                //  VTSM    TS      TPGC    NOCH
+                //  VMGM    TS      TPGC    NOCH
                 //  VTSM    NONE    TPGC    CHXX
                 //  VMGM    NONE    TPGC    CHXX
                 //  VTSM    VMGM    TPGC    CHXX
                 //  VMGM    VMGM    TPGC    CHXX
-                //  VTSM    TS  TPGC    CHXX
-                //  VMGM    TS  TPGC    CHXX
+                //  VTSM    TS      TPGC    CHXX
+                //  VMGM    TS      TPGC    CHXX
                 fprintf(stderr, "ERR:  Cannot 'call' a menu from another menu, use 'jump' instead\n");
                 return 0;
               } /*if*/
@@ -1027,16 +1027,16 @@ static unsigned char *compilecs
               {
                 //  VTS NONE    NOPGC   NOCH
                 //  VTS VMGM    NOPGC   NOCH
-                //  VTS TS  NOPGC   NOCH
+                //  VTS TS      NOPGC   NOCH
                 //  VTS NONE    NOPGC   CHXX
                 //  VTS VMGM    NOPGC   CHXX
-                //  VTS TS  NOPGC   CHXX
+                //  VTS TS      NOPGC   CHXX
                 //  VTS NONE    TPGC    NOCH
                 //  VTS VMGM    TPGC    NOCH
-                //  VTS TS  TPGC    NOCH
+                //  VTS TS      TPGC    NOCH
                 //  VTS NONE    TPGC    CHXX
                 //  VTS VMGM    TPGC    CHXX
-                //  VTS TS  TPGC    CHXX
+                //  VTS TS      TPGC    CHXX
 
                 fprintf(stderr, "ERR:  Cannot 'call' another title, use 'jump' instead\n");
                 return 0;
@@ -1045,10 +1045,10 @@ static unsigned char *compilecs
               {
                 //  VTS NONE    MPGC    CHXX
                 //  VTS VMGM    MPGC    CHXX
-                //  VTS TS  MPGC    CHXX
+                //  VTS TS      MPGC    CHXX
                 //  VTS NONE    MEPGC   CHXX
                 //  VTS VMGM    MEPGC   CHXX
-                //  VTS TS  MEPGC   CHXX
+                //  VTS TS      MEPGC   CHXX
                 fprintf(stderr, "ERR:  Cannot 'call' a chapter within a menu\n");
                 return 0;
               } /*if*/
@@ -1162,7 +1162,7 @@ static unsigned int extractif(const unsigned char *b)
     case 1:
     case 2:
         return
-                (b[1] >> 4) << 24 /* the comparison op and the command to be performed */
+                (b[1] >> 4) << 24 /* the comparison op and direct-operand-2 flag */
             |
                 b[3] << 16 /* operand 1 for the comparison */
             |
@@ -1180,7 +1180,7 @@ static unsigned int negateif(unsigned int ifs)
   /* negates the comparison op part of a value returned from extractif. */
   {
     return
-            ifs & 0x8ffffff /* remove comparison op */
+            ifs & 0x8ffffff /* remove comparison op, leave direct flag and operands */
         |
             negatecompare((ifs >> 24) & 7) << 24; /* replace with opposite comparison */
   } /*negateif*/
@@ -1205,7 +1205,7 @@ static void applyif(unsigned char *b,unsigned int ifs)
         b[7] = ifs; /* assume ifs >> 8 & 255 is zero! */
         b[6] = ifs >> 16;
         b[1] |= (ifs >> 24) << 4;
-    break;        
+    break;
 
     case 6:
     case 7:
@@ -1260,17 +1260,29 @@ static bool ifcombinable(unsigned char b0 /* actually caller always passes 0 */,
       } /*switch*/
   } /*ifcombinable*/
 
-static int countreferences(const unsigned char *buf, const unsigned char *end, int linenum)
-  /* how many branches are there with destination linenum. Actually caller only cares
-    whether result is zero or not. */
+static bool isreferenced(const unsigned char *buf, const unsigned char *end, int linenum)
+  /* checks if there are any branches with destination linenum. */
   {
     const unsigned char *b;
-    int numref = 0;
-    for (b = buf; b < end; b += 8)
+    bool referenced;
+    for (b = buf;;)
+      {
+        if (b == end)
+          {
+            referenced = false;
+            break;
+          } /*if*/
         if (b[0] == 0 && (b[1] & 15) == 1 && b[7] == linenum)
-            numref++;
-    return numref;
-  } /*countreferences*/
+          /* check for goto -- fixme: should also check for SetTmpPML if I ever implement that */
+          {
+            referenced = true;
+            break;
+          } /*if*/
+        b += 8;
+      } /*for*/
+    return
+        referenced;
+  } /*isreferenced*/
 
 static void deleteinstruction
   (
@@ -1291,6 +1303,31 @@ static void deleteinstruction
     *end -= 8;
     memset(*end, 0, 8); // clean up tracks (so pgc structure is not polluted)
   } /*deleteinstruction*/
+
+static void dumpcode
+  (
+    const char * descr,
+    const unsigned char *obuf, /* start of buffer for computing instruction numbers for branches */
+    unsigned char *buf, /* where to insert new compiled code */
+    const unsigned char *end /* points to after last instruction generated */
+  )
+  /* dumps out compiled code for debugging. */
+  {
+#ifdef VM_DEBUG
+    const unsigned int nrlines = (end - buf) / 8;
+    unsigned int i, j;
+    fprintf(stderr, "* %s:\n", descr);
+    for (i = 0; i < nrlines; ++i)
+      {
+        fprintf(stderr, " %3d:", i + (buf - obuf) + 1);
+        for (j = 0; j < 8; ++j)
+          {
+            fprintf(stderr, " %02X", buf[i * 8 + j]);
+          } /*for*/
+        fputs("\n", stderr);
+      } /*for*/
+#endif
+  } /*dumpcode*/
 
 void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **end)
   /* does various peephole optimizations on the part of obuf from buf to *end.
@@ -1319,15 +1356,22 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
             &&
                 (b[9] & 0x70) == 0 /* second instr not conditional */
             &&
+                (
+                    (b[8] & 15) == 0 /* not a set */
+                ||
+                    (b[9] & 15) == 0 /* not a link */
+                ) /* not set-and-link in one */
+            &&
                 ifcombinable(b[0], b[1], b[8]) // step 2
             &&
-                countreferences(buf, *end, curline + 1) == 0 // step 3
+                !isreferenced(buf, *end, curline + 1) // step 3
           )
           {
             const unsigned int ifs = negateif(extractif(b));
             memcpy(b, b + 8, 8); // move statement
             memset(b + 8, 0, 8); // replace with nop
             applyif(b, ifs);
+            dumpcode("vm_optimize: jump over one => inverse conditional", obuf, buf, *end);
             goto again;
           } /*if*/
         // 1. this is a NOP instruction
@@ -1343,7 +1387,7 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
                 b[2] == 0
             &&
                 b[3] == 0
-            && 
+            &&
                 b[4] == 0
             &&
                 b[5] == 0
@@ -1355,11 +1399,12 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
                 (
                     b + 8 != *end /* more instructions after this */
                 ||
-                    countreferences(buf, *end, curline) == 0 /* no references here */
+                    !isreferenced(buf, *end, curline) /* no references here */
                 )
           )
           {
             deleteinstruction(obuf, buf, end, b);
+            dumpcode("vm_optimize: remove nop", obuf, buf, *end);
             goto again;
           } /*if*/
         // if
@@ -1377,12 +1422,13 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
             &&
                 (b[-7] & 15) != 0 /* previous was unconditional transfer */
             &&
-                countreferences(buf, *end, curline) == 0 /* no references here */
+                !isreferenced(buf, *end, curline) /* no references here */
            /* fixme: should also remove in the case where jump was to this instruction */
           )
           {
           /* remove dead code */
             deleteinstruction(obuf, buf, end, b);
+            dumpcode("vm_optimize: remove dead code", obuf, buf, *end);
             goto again;
           } /*if*/
         // if
@@ -1396,7 +1442,7 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
           (
                 b + 8 != *end
             &&
-                (b[0] & 0xEF) == 0x41
+                (b[0] & 0xEF) == 0x41 /* SetSTN */
             &&
                 b[1] == 0 // step 1
             &&
@@ -1404,7 +1450,7 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
             &&
                 b[1] == b[9] // step 2 & 3
             &&
-                countreferences(buf, *end, curline + 1) == 0
+                !isreferenced(buf, *end, curline + 1)
           )
           {
             if (b[8 + 3])
@@ -1414,6 +1460,7 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
             if (b[8 + 5])
                 b[5] = b[8 + 5];
             deleteinstruction(obuf, buf, end, b + 8);
+            dumpcode("vm_optimize: merge setting of subtitle/angle/audio", obuf, buf, *end);
             goto again;
           } /*if*/
         // if
@@ -1434,7 +1481,7 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
             &&
                 (
                     (b[8 + 1] & 0xf) == 5
-                || 
+                ||
                     (b[8 + 1] & 0xf) == 6
                 ||
                     (b[8 + 1] & 0xf) == 7
@@ -1444,12 +1491,13 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
                         (b[8 + 7] & 0x1f) != 0
                 )
             &&
-                countreferences(buf, *end, curline + 1) == 0
+                !isreferenced(buf, *end, curline + 1)
           )
           {
             if (b[8 + 6] == 0)
                 b[8 + 6] = b[4];
             deleteinstruction(obuf, buf, end, b);
+            dumpcode("vm_optimize: merge set button and link", obuf, buf, *end);
             goto again;
           } /*if*/
         // if
@@ -1470,7 +1518,7 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
             &&
                 (
                     (b[8 + 1] & 0x7f) == 4
-                || 
+                ||
                     (b[8 + 1] & 0x7f) == 5
                 ||
                     (b[8 + 1] & 0x7f) == 6
@@ -1482,13 +1530,14 @@ void vm_optimize(const unsigned char *obuf, unsigned char *buf, unsigned char **
                         (b[8 + 7] & 0x1f) != 0
                 )
             &&
-                countreferences(buf, *end, curline + 1) == 0
+                !isreferenced(buf, *end, curline + 1)
           )
           {
             b[1] = b[8 + 1];
             b[6] = b[8 + 6];
             b[7] = b[8 + 7];
             deleteinstruction(obuf, buf, end, b + 8);
+            dumpcode("vm_optimize: merge set register and link", obuf, buf, *end);
             goto again;
           } /*if*/
       } /*for*/
@@ -1527,7 +1576,9 @@ unsigned char *vm_compile
           } /*if*/
         gotos[i].code[7] = (labels[j].code - obuf) / 8 + 1;
       } /*for*/
+    dumpcode("vm_compile: before vm_optimize", obuf, buf, end);
     vm_optimize(obuf, buf, &end);
+    dumpcode("vm_compile: after vm_optimize", obuf, buf, end);
     return end;
   } /*vm_compile*/
 

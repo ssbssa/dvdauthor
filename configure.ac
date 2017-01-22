@@ -1,9 +1,10 @@
-AC_INIT(DVDAuthor,0.7.1+,dvdauthor-users@lists.sourceforge.net)
+AC_INIT(DVDAuthor,0.7.2,dvdauthor-users@lists.sourceforge.net)
 
-AM_CONFIG_HEADER(src/config.h)
+AC_CONFIG_HEADERS(src/config.h)
 AC_CONFIG_AUX_DIR(autotools)
 
 AM_INIT_AUTOMAKE
+LT_INIT
 AM_PROG_CC_C_O
 
 AC_PROG_INSTALL
@@ -85,9 +86,14 @@ PKG_CHECK_MODULES(LIBPNG, [libpng])
 AC_SUBST(LIBPNG_CFLAGS)
 AC_SUBST(LIBPNG_LIBS)
 
+config_static=''
+if test "$enable_shared" = 'no'; then
+    config_static='--static'
+fi
+
 usemagick=0
 
-AC_CHECK_PROGS(MAGICKCONFIG, [Magick-config])
+AC_CHECK_PROGS(MAGICKCONFIG, [MagickCore-config])
 if test -n "$MAGICKCONFIG"; then
     ac_save_CPPFLAGS="$CPPFLAGS"
     ac_save_LIBS="$LIBS"
@@ -105,21 +111,7 @@ if test -n "$MAGICKCONFIG"; then
 fi
 
 if test "$usemagick" != 1; then
-    AC_CHECK_PROGS(GMAGICKCONFIG, [GraphicsMagick-config])
-    if test -n "$GMAGICKCONFIG"; then
-        ac_save_CPPFLAGS="$CPPFLAGS"
-        ac_save_LIBS="$LIBS"
-        MAGICK_CPPFLAGS="`$GMAGICKCONFIG --cppflags`"
-        MAGICK_LIBS="`$GMAGICKCONFIG --ldflags` `$GMAGICKCONFIG --libs`"
-        CPPFLAGS="$CPPFLAGS $MAGICK_CPPFLAGS"
-        LIBS="$MAGICK_LIBS $LIBS"
-        AC_CHECK_FUNC(DispatchImage, usemagick=1)
-        CPPFLAGS="$ac_save_CPPFLAGS"
-        LIBS="$ac_save_LIBS"
-        if test "$usemagick" = 1; then
-            AC_DEFINE(HAVE_GMAGICK, 1, [Whether the GraphicsMagick libraries are available])
-        fi
-    fi
+    PKG_CHECK_MODULES([MAGICK], [GraphicsMagick], usemagick=1; [AC_DEFINE(HAVE_GMAGICK, 1, [whether the GraphicsMagick libraries are available])], [:])
 fi
 
 if test "$usemagick" != 1; then
@@ -144,7 +136,7 @@ AC_SUBST(FRIBIDI_LIBS)
 AC_CHECK_PROGS(FREETYPECONFIG, [freetype-config])
 if test -n "$FREETYPECONFIG"; then
     FREETYPE_CPPFLAGS="`$FREETYPECONFIG --cflags`"
-    FREETYPE_LIBS="`$FREETYPECONFIG --libs`"
+    FREETYPE_LIBS="`$FREETYPECONFIG --libs $config_static`"
     AC_DEFINE(HAVE_FREETYPE, 1, [Whether FreeType is available])
 
     ac_save_CPPFLAGS="$CPPFLAGS"

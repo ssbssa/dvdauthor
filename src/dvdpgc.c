@@ -20,7 +20,6 @@
  * MA 02110-1301 USA.
  */
 
-#include "config.h"
 #include "compat.h"
 #include <errno.h>
 #include <assert.h>
@@ -305,7 +304,7 @@ static int genpgc(unsigned char *buf,const struct workset *ws,const struct pgcgr
                     cd = cdd;
                   } /*if*/
               } /*for; for*/
-        
+
         write2(buf + 228, d); /* offset to commands */
         if (cd - (buf + d) - 8 > 128 * 8) // can only have 128 commands
           {
@@ -511,7 +510,6 @@ int CreatePGC(FILE *h, const struct workset *ws, vtypes ismenu)
     in_it = true;
     buf = bigwritebuf;
     memset(buf, 0, bigwritebuflen);
-    ph = 0;
     if (ismenu != VTYPE_VTS) /* create VMGM_PGCI_UT/VTSM_PGCI_UT structure */
       {
         buf[1] = ws->menus->numgroups; // # of language units
